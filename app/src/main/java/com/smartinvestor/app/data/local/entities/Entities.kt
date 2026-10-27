@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 // ══════════════════════════════════════════════════════════
-// Room Entities — Offline Cache per gemini.md §2
+// Room Entities — Offline Cache & Paper Trading
 // ══════════════════════════════════════════════════════════
 
 @Entity(tableName = "cached_stocks")
@@ -44,4 +44,33 @@ data class NotificationEntity(
 data class SearchHistoryEntity(
     @PrimaryKey val query: String,
     val timestamp: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "portfolio_holdings")
+data class HoldingEntity(
+    @PrimaryKey val symbol: String,
+    val companyName: String,
+    val quantity: Int,
+    val avgBuyPrice: Double,
+    val lastUpdated: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "paper_orders")
+data class OrderEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val symbol: String,
+    val companyName: String,
+    val type: String, // "BUY" or "SELL"
+    val quantity: Int,
+    val executionPrice: Double,
+    val timestamp: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "lesson_progress")
+data class LessonProgressEntity(
+    @PrimaryKey val lessonId: String,
+    val isCompleted: Boolean = false,
+    val progress: Float = 0f,
+    val quizScore: Int = 0,
+    val lastAccessed: Long = System.currentTimeMillis(),
 )

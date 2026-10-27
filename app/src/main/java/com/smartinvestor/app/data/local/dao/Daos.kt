@@ -1,10 +1,7 @@
 package com.smartinvestor.app.data.local.dao
 
 import androidx.room.*
-import com.smartinvestor.app.data.local.entities.CachedStockEntity
-import com.smartinvestor.app.data.local.entities.NotificationEntity
-import com.smartinvestor.app.data.local.entities.SearchHistoryEntity
-import com.smartinvestor.app.data.local.entities.WatchlistEntity
+import com.smartinvestor.app.data.local.entities.*
 import kotlinx.coroutines.flow.Flow
 
 // ══════════════════════════════════════════════════════════
@@ -84,4 +81,46 @@ interface SearchHistoryDao {
 
     @Query("DELETE FROM search_history")
     suspend fun clearAll()
+}
+
+@Dao
+interface HoldingDao {
+    @Query("SELECT * FROM portfolio_holdings ORDER BY symbol ASC")
+    fun getAllHoldings(): Flow<List<HoldingEntity>>
+
+    @Query("SELECT * FROM portfolio_holdings WHERE symbol = :symbol")
+    suspend fun getHolding(symbol: String): HoldingEntity?
+
+    @Upsert
+    suspend fun upsertHolding(holding: HoldingEntity)
+
+    @Query("DELETE FROM portfolio_holdings WHERE symbol = :symbol")
+    suspend fun deleteHolding(symbol: String)
+
+    @Query("DELETE FROM portfolio_holdings")
+    suspend fun clearAll()
+}
+
+@Dao
+interface OrderDao {
+    @Query("SELECT * FROM paper_orders ORDER BY timestamp DESC")
+    fun getAllOrders(): Flow<List<OrderEntity>>
+
+    @Insert
+    suspend fun insertOrder(order: OrderEntity): Long
+
+    @Query("DELETE FROM paper_orders")
+    suspend fun clearAll()
+}
+
+@Dao
+interface LessonProgressDao {
+    @Query("SELECT * FROM lesson_progress")
+    fun getAllProgress(): Flow<List<LessonProgressEntity>>
+
+    @Query("SELECT * FROM lesson_progress WHERE lessonId = :lessonId")
+    suspend fun getProgress(lessonId: String): LessonProgressEntity?
+
+    @Upsert
+    suspend fun saveProgress(progress: LessonProgressEntity)
 }

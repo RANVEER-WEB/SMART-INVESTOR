@@ -6,10 +6,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.smartinvestor.app.data.repository.UserPreferencesRepository
 import com.smartinvestor.app.navigation.SmartInvestorNavGraph
 import com.smartinvestor.app.ui.theme.SmartInvestorTheme
 import com.smartinvestor.app.ui.theme.ThemeMode
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 // ══════════════════════════════════════════════════════════
 // Smart Investor — Main Activity
@@ -18,6 +21,10 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var preferencesRepository: UserPreferencesRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -31,8 +38,9 @@ class MainActivity : ComponentActivity() {
             // Signal ready immediately — Compose is now rendering
             LaunchedEffect(Unit) { isReady = true }
 
-            // Theme mode — will be connected to DataStore in Phase 2
-            var themeMode by remember { mutableStateOf(ThemeMode.DARK) }
+            // Theme mode connected to DataStore per gemini.md §2
+            val themeMode by preferencesRepository.themeMode
+                .collectAsStateWithLifecycle(initialValue = ThemeMode.DARK)
 
             SmartInvestorTheme(themeMode = themeMode) {
                 SmartInvestorNavGraph()

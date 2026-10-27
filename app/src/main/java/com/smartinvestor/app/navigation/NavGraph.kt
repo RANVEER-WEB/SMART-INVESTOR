@@ -12,10 +12,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.smartinvestor.app.ui.components.BottomNavItem
 import com.smartinvestor.app.ui.components.SmartInvestorBottomBar
 import com.smartinvestor.app.ui.screens.admin.AdminScreen
@@ -25,13 +27,18 @@ import com.smartinvestor.app.ui.screens.auth.RegisterScreen
 import com.smartinvestor.app.ui.screens.dashboard.DashboardScreen
 import com.smartinvestor.app.ui.screens.kyc.KycStepperScreen
 import com.smartinvestor.app.ui.screens.learning.LearningScreen
+import com.smartinvestor.app.ui.screens.learning.LessonDetailScreen
+import com.smartinvestor.app.ui.screens.learning.QuizScreen
 import com.smartinvestor.app.ui.screens.notifications.NotificationsScreen
 import com.smartinvestor.app.ui.screens.portfolio.PortfolioScreen
 import com.smartinvestor.app.ui.screens.settings.SettingsScreen
 import com.smartinvestor.app.ui.screens.splash.SplashScreen
+import com.smartinvestor.app.ui.screens.stock_detail.StockDetailScreen
 import com.smartinvestor.app.ui.screens.tools.FinancialToolsScreen
+import com.smartinvestor.app.ui.screens.tools.RiskAssessmentScreen
 import com.smartinvestor.app.ui.screens.watchlist.WatchlistScreen
 import com.smartinvestor.app.ui.screens.PlaceholderScreen
+
 // ══════════════════════════════════════════════════════════
 // Smart Investor — Centralized NavHost
 // Per gemini.md §1: 25+ Composable modules
@@ -150,11 +157,26 @@ fun SmartInvestorNavGraph(
                 DashboardScreen(
                     onNavigateToAiAdvisor = { navController.navigate(Routes.AI_ADVISOR) },
                     onNavigateToNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
+                    onNavigateToStock = { symbol -> navController.navigate("stock_detail/$symbol") },
+                    onNavigateToTools = { navController.navigate(Routes.FINANCIAL_TOOLS) },
+                    onNavigateToRiskQuiz = { navController.navigate(Routes.RISK_ASSESSMENT) }
                 )
             }
 
-            composable(Routes.PORTFOLIO) { PortfolioScreen() }
-            composable(Routes.WATCHLIST) { WatchlistScreen() }
+            composable(
+                route = Routes.STOCK_DETAIL,
+                arguments = listOf(navArgument("symbol") { type = NavType.StringType })
+            ) {
+                StockDetailScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.PORTFOLIO) {
+                PortfolioScreen(onNavigateToStock = { symbol -> navController.navigate("stock_detail/$symbol") })
+            }
+
+            composable(Routes.WATCHLIST) {
+                WatchlistScreen(onNavigateToStock = { symbol -> navController.navigate("stock_detail/$symbol") })
+            }
 
             composable(Routes.AI_ADVISOR) {
                 AiAdvisorScreen(onBack = { navController.popBackStack() })
@@ -173,7 +195,34 @@ fun SmartInvestorNavGraph(
             }
 
             composable(Routes.LEARNING) {
-                LearningScreen(onBack = { navController.popBackStack() })
+                LearningScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToLesson = { lessonId -> navController.navigate("lesson_detail/$lessonId") }
+                )
+            }
+
+            composable(
+                route = Routes.LESSON_DETAIL,
+                arguments = listOf(navArgument("lessonId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val lessonId = backStackEntry.arguments?.getString("lessonId") ?: "lesson_1"
+                LessonDetailScreen(
+                    lessonId = lessonId,
+                    onBack = { navController.popBackStack() },
+                    onTakeQuiz = { id -> navController.navigate("quiz/$id") }
+                )
+            }
+
+            composable(
+                route = Routes.QUIZ,
+                arguments = listOf(navArgument("lessonId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val lessonId = backStackEntry.arguments?.getString("lessonId") ?: "lesson_1"
+                QuizScreen(
+                    lessonId = lessonId,
+                    onBack = { navController.popBackStack() },
+                    onQuizPassed = { /* optionally handle badge award */ }
+                )
             }
 
             composable(Routes.ADMIN) {
@@ -181,27 +230,30 @@ fun SmartInvestorNavGraph(
             }
 
             composable(Routes.FINANCIAL_TOOLS) {
-                FinancialToolsScreen(onBack = { navController.popBackStack() })
+                FinancialToolsScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToRiskQuiz = { navController.navigate(Routes.RISK_ASSESSMENT) }
+                )
+            }
+
+            composable(Routes.RISK_ASSESSMENT) {
+                RiskAssessmentScreen(onBack = { navController.popBackStack() })
             }
             
-            // Placeholder routes for 25+ architecture requirement
+            // Sub-routes and specialized modules
             composable(Routes.MFA_VERIFY) { PlaceholderScreen("MFA Verify") { navController.popBackStack() } }
             composable(Routes.BIOMETRIC_SETUP) { PlaceholderScreen("Biometric Setup") { navController.popBackStack() } }
             composable(Routes.KYC_PAN) { PlaceholderScreen("PAN Verification") { navController.popBackStack() } }
             composable(Routes.KYC_AADHAAR) { PlaceholderScreen("Aadhaar Verification") { navController.popBackStack() } }
             composable(Routes.KYC_BANK) { PlaceholderScreen("Bank Linking") { navController.popBackStack() } }
             composable(Routes.KYC_DEMAT) { PlaceholderScreen("Demat Linking") { navController.popBackStack() } }
-            composable(Routes.STOCK_DETAIL) { PlaceholderScreen("Stock Detail") { navController.popBackStack() } }
             composable(Routes.MARKET_MOVERS) { PlaceholderScreen("Market Movers") { navController.popBackStack() } }
             composable(Routes.PORTFOLIO_HISTORY) { PlaceholderScreen("Portfolio History") { navController.popBackStack() } }
-            composable(Routes.LESSON_DETAIL) { PlaceholderScreen("Lesson Detail") { navController.popBackStack() } }
-            composable(Routes.QUIZ) { PlaceholderScreen("Quiz") { navController.popBackStack() } }
             composable(Routes.USER_MGMT) { PlaceholderScreen("User Management") { navController.popBackStack() } }
             composable(Routes.PAYMENT_MGMT) { PlaceholderScreen("Payment Management") { navController.popBackStack() } }
             composable(Routes.TICKET_MGMT) { PlaceholderScreen("Ticket Management") { navController.popBackStack() } }
-            composable(Routes.SIP_CALCULATOR) { PlaceholderScreen("SIP Calculator") { navController.popBackStack() } }
-            composable(Routes.TAX_REPORT) { PlaceholderScreen("Tax Report") { navController.popBackStack() } }
-            composable(Routes.RISK_ASSESSMENT) { PlaceholderScreen("Risk Assessment") { navController.popBackStack() } }
+            composable(Routes.SIP_CALCULATOR) { FinancialToolsScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.TAX_REPORT) { FinancialToolsScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }

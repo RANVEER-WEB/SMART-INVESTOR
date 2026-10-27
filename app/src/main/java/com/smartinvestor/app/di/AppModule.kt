@@ -6,10 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.smartinvestor.app.data.local.AppDatabase
-import com.smartinvestor.app.data.local.dao.NotificationDao
-import com.smartinvestor.app.data.local.dao.SearchHistoryDao
-import com.smartinvestor.app.data.local.dao.StockDao
-import com.smartinvestor.app.data.local.dao.WatchlistDao
+import com.smartinvestor.app.data.local.dao.*
 import com.smartinvestor.app.data.remote.FinnhubApi
 import com.smartinvestor.app.data.remote.GeminiApi
 import dagger.Module
@@ -54,6 +51,15 @@ object AppModule {
 
     @Provides
     fun provideSearchHistoryDao(db: AppDatabase): SearchHistoryDao = db.searchHistoryDao()
+
+    @Provides
+    fun provideHoldingDao(db: AppDatabase): HoldingDao = db.holdingDao()
+
+    @Provides
+    fun provideOrderDao(db: AppDatabase): OrderDao = db.orderDao()
+
+    @Provides
+    fun provideLessonProgressDao(db: AppDatabase): LessonProgressDao = db.lessonProgressDao()
 
     // ── DataStore Preferences ──
 

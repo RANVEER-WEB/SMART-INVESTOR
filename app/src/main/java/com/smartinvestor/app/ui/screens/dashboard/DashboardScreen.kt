@@ -1,6 +1,6 @@
 package com.smartinvestor.app.ui.screens.dashboard
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,8 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,22 +22,30 @@ import com.smartinvestor.app.domain.model.WatchlistItem
 import com.smartinvestor.app.ui.components.*
 import com.smartinvestor.app.ui.theme.*
 
-// ══════════════════════════════════════════════════════════
-// Smart Investor — Dashboard (Primary Command Center)
-// Per gemini.md §1.4: Interactive 3D Stock Graph
-// ══════════════════════════════════════════════════════════
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     onNavigateToAiAdvisor: () -> Unit,
     onNavigateToNotifications: () -> Unit,
+    onNavigateToStock: (String) -> Unit = {},
+    onNavigateToTools: () -> Unit = {},
+    onNavigateToRiskQuiz: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val stocksState by viewModel.stocksState.collectAsStateWithLifecycle()
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
     val selectedSymbol by viewModel.selectedSymbol.collectAsStateWithLifecycle()
     val chartState by viewModel.chartState.collectAsStateWithLifecycle()
+    val chartTimeframe by viewModel.chartTimeframe.collectAsStateWithLifecycle()
+
+    val portfolioNetWorth by viewModel.portfolioNetWorth.collectAsStateWithLifecycle()
+    val (portfolioPL, portfolioPLPercent) = viewModel.portfolioProfitLoss.collectAsStateWithLifecycle().value
+
+    var showSearchDialog by remember { mutableStateOf(false) }
+    var searchInput by remember { mutableStateOf("") }
+    val recentSearches by viewModel.recentSearches.collectAsStateWithLifecycle()
+
+    val isPositivePL = portfolioPL >= 0
 
     Column(
         modifier = Modifier
@@ -56,30 +62,47 @@ fun DashboardScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Good Morning 👋", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Smart Investor", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onBackground)
+                Text(
+                    text = "Welcome Back 👋",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Smart Investor",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = { showSearchDialog = true }) {
+                    Icon(Icons.Rounded.Search, "Search Stocks", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 IconButton(onClick = onNavigateToNotifications) {
                     Icon(Icons.Rounded.Notifications, "Notifications", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                // AI Orb
+                // Signature AI Orb button
                 IconButton(onClick = onNavigateToAiAdvisor) {
-                    Icon(Icons.Rounded.AutoAwesome, "AI Advisor", tint = PremiumPurple)
+                    Icon(Icons.Rounded.AutoAwesome, "AI Advisor", tint = PremiumPurpleLight)
                 }
             }
         }
 
-        // ── Offline Indicator ──
+        // ── Offline Protocol Alert ──
         if (isOffline) {
             Surface(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
                 color = DangerRedContainer,
                 shape = MaterialTheme.shapes.small
             ) {
-                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Icon(Icons.Rounded.WifiOff, null, tint = DangerRed, modifier = Modifier.size(16.dp))
-                    Text("Showing cached data", style = MaterialTheme.typography.labelSmall, color = DangerRed)
+                    Text("Offline · Showing cached data", style = MaterialTheme.typography.labelSmall, color = DangerRed)
                     Spacer(modifier = Modifier.weight(1f))
                     TextButton(onClick = { viewModel.loadDashboard() }) {
                         Text("Retry Sync", style = MaterialTheme.typography.labelSmall, color = DangerRed)
@@ -89,46 +112,99 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // ── Portfolio Value Card ──
-        GlassCard(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            showGlow = true,
-            glowColor = PremiumPurple
+        // ── Indian Market Indices Strip ──
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Total Portfolio Value", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            items(viewModel.marketIndices) { idx ->
+                IndexChip(index = idx)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // ── Portfolio Value Hero Card (Linked to real portfolio data) ──
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            showGlow = true,
+            glowColor = if (isPositivePL) SuccessGreen else DangerRed
+        ) {
+            Text(
+                text = "Total Portfolio Net Worth (Paper Trading)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text("₹12,45,678.90", style = FinancialBalanceStyle, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = "₹${String.format("%,.2f", portfolioNetWorth)}",
+                style = FinancialBalanceStyle,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(Icons.Rounded.TrendingUp, null, tint = SuccessGreen, modifier = Modifier.size(16.dp))
-                Text("+₹24,560.00 (2.34%)", style = StockChangeStyle, color = SuccessGreen)
-                Text("today", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(
+                    imageVector = if (isPositivePL) Icons.Rounded.TrendingUp else Icons.Rounded.TrendingDown,
+                    contentDescription = null,
+                    tint = if (isPositivePL) SuccessGreen else DangerRed,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "${if (isPositivePL) "+" else ""}₹${String.format("%,.2f", portfolioPL)} (${String.format("%+.2f", portfolioPLPercent)}%)",
+                    style = StockChangeStyle,
+                    color = if (isPositivePL) SuccessGreen else DangerRed
+                )
+                Text("overall P&L", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── Stock Chart Area ──
-        Text("Interactive Chart · $selectedSymbol", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 20.dp))
-        Spacer(modifier = Modifier.height(8.dp))
-        GlassCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(220.dp)) {
+        // ── Interactive Chart Hero Feature ──
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Interactive Chart · $selectedSymbol",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            TextButton(onClick = { onNavigateToStock(selectedSymbol) }) {
+                Text("Full Details", color = PremiumPurpleLight, style = MaterialTheme.typography.labelSmall)
+                Icon(Icons.Rounded.ChevronRight, null, tint = PremiumPurpleLight, modifier = Modifier.size(16.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
             when (val state = chartState) {
                 is UiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = PremiumPurple)
                     }
                 }
                 is UiState.Success -> {
-                    if (state.data.closePrices.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No chart data available", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    } else {
-                        Interactive3DStockChart(prices = state.data.closePrices.map { it.toFloat() })
-                    }
+                    val prices = state.data.closePrices.map { it.toFloat() }
+                    InteractiveStockChart(
+                        prices = prices,
+                        selectedTimeframe = chartTimeframe,
+                        onTimeframeSelected = { viewModel.setChartTimeframe(it) },
+                        currencySymbol = "₹"
+                    )
                 }
                 is UiState.Error -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
                         Text(state.message, color = DangerRed, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -139,35 +215,151 @@ fun DashboardScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // ── Market Movers ──
-        Text("Market Movers", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 20.dp))
+        Text(
+            text = "Market Movers",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
         Spacer(modifier = Modifier.height(8.dp))
 
         when (stocksState) {
-            is UiState.Loading -> LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            is UiState.Loading -> LazyRow(
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(4) { ShimmerBox(modifier = Modifier.width(160.dp).height(100.dp)) }
             }
             is UiState.Success -> {
                 val stocks = (stocksState as UiState.Success<List<WatchlistItem>>).data
-                LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(stocks) { stock -> StockMoverCard(stock = stock, onClick = { viewModel.loadChart(stock.symbol) }) }
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(stocks) { stock ->
+                        StockMoverCard(
+                            stock = stock,
+                            onClick = {
+                                viewModel.loadChart(stock.symbol)
+                                onNavigateToStock(stock.symbol)
+                            }
+                        )
+                    }
                 }
             }
-            is UiState.Error -> ErrorCard(message = (stocksState as UiState.Error).message, onRetry = { viewModel.loadDashboard() }, modifier = Modifier.padding(horizontal = 20.dp))
+            is UiState.Error -> ErrorCard(
+                message = (stocksState as UiState.Error).message,
+                onRetry = { viewModel.loadDashboard() },
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
             else -> {}
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
         // ── Quick Actions ──
-        Text("Quick Actions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 20.dp))
+        Text(
+            text = "Quick Wealth Tools",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            QuickActionCard("SIP Calc", Icons.Rounded.Calculate, Modifier.weight(1f)) {}
-            QuickActionCard("Tax Report", Icons.Rounded.Description, Modifier.weight(1f)) {}
-            QuickActionCard("Risk Quiz", Icons.Rounded.Quiz, Modifier.weight(1f)) {}
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            QuickActionCard("SIP Calc", Icons.Rounded.Calculate, Modifier.weight(1f)) {
+                onNavigateToTools()
+            }
+            QuickActionCard("Risk Quiz", Icons.Rounded.Quiz, Modifier.weight(1f)) {
+                onNavigateToRiskQuiz()
+            }
+            QuickActionCard("AI Copilot", Icons.Rounded.AutoAwesome, Modifier.weight(1f)) {
+                onNavigateToAiAdvisor()
+            }
         }
 
         Spacer(modifier = Modifier.height(100.dp)) // Bottom nav padding
+    }
+
+    // ── Live Search Dialog ──
+    if (showSearchDialog) {
+        AlertDialog(
+            onDismissRequest = { showSearchDialog = false },
+            title = { Text("Search Stock Symbols") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = searchInput,
+                        onValueChange = { searchInput = it },
+                        placeholder = { Text("e.g. AAPL, TSLA, NVDA") },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (recentSearches.isNotEmpty()) {
+                        Text("Recent Searches", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            recentSearches.take(4).forEach { query ->
+                                AssistChip(
+                                    onClick = {
+                                        searchInput = query
+                                        viewModel.recordSearch(query)
+                                        showSearchDialog = false
+                                        onNavigateToStock(query)
+                                    },
+                                    label = { Text(query) }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val sym = searchInput.trim().uppercase()
+                        if (sym.isNotBlank()) {
+                            viewModel.recordSearch(sym)
+                            showSearchDialog = false
+                            onNavigateToStock(sym)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PremiumPurple)
+                ) {
+                    Text("Search & Open")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSearchDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun IndexChip(index: MarketIndex) {
+    val isPositive = index.change >= 0
+    GlassCard(modifier = Modifier.width(140.dp)) {
+        Text(index.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("₹${String.format("%,.1f", index.value)}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Icon(
+                imageVector = if (isPositive) Icons.Rounded.TrendingUp else Icons.Rounded.TrendingDown,
+                contentDescription = null,
+                tint = if (isPositive) SuccessGreen else DangerRed,
+                modifier = Modifier.size(12.dp)
+            )
+            Text(
+                text = "${String.format("%+.2f", index.changePercent)}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isPositive) SuccessGreen else DangerRed
+            )
+        }
     }
 }
 
@@ -178,7 +370,7 @@ private fun StockMoverCard(stock: WatchlistItem, onClick: () -> Unit) {
         Text(stock.symbol, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
         Text(stock.companyName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         Spacer(modifier = Modifier.height(8.dp))
-        Text("$${String.format("%.2f", stock.currentPrice)}", style = StockPriceStyle, color = MaterialTheme.colorScheme.onSurface)
+        Text("₹${String.format("%.2f", stock.currentPrice)}", style = StockPriceStyle, color = MaterialTheme.colorScheme.onSurface)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Icon(if (isPositive) Icons.Rounded.TrendingUp else Icons.Rounded.TrendingDown, null, tint = if (isPositive) SuccessGreen else DangerRed, modifier = Modifier.size(14.dp))
             Text("${String.format("%+.2f", stock.changePercent)}%", style = StockChangeStyle, color = if (isPositive) SuccessGreen else DangerRed)
@@ -194,59 +386,5 @@ private fun QuickActionCard(label: String, icon: androidx.compose.ui.graphics.ve
             Spacer(modifier = Modifier.height(6.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    }
-}
-
-@Composable
-fun Interactive3DStockChart(prices: List<Float>) {
-    val maxPrice = prices.maxOrNull() ?: 1f
-    val minPrice = prices.minOrNull() ?: 0f
-    val range = (maxPrice - minPrice).takeIf { it > 0 } ?: 1f
-    
-    val isPositive = prices.last() >= prices.first()
-    val lineColor = if (isPositive) SuccessGreen else DangerRed
-    
-    Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-        val width = size.width
-        val height = size.height
-        val stepX = width / (prices.size - 1).coerceAtLeast(1)
-        
-        val path = androidx.compose.ui.graphics.Path().apply {
-            prices.forEachIndexed { index, price ->
-                val x = index * stepX
-                val normalizedY = 1f - ((price - minPrice) / range)
-                val y = normalizedY * height
-                
-                if (index == 0) moveTo(x, y)
-                else lineTo(x, y)
-            }
-        }
-        
-        // Draw glow/gradient underneath
-        val fillPath = androidx.compose.ui.graphics.Path().apply {
-            addPath(path)
-            lineTo(width, height)
-            lineTo(0f, height)
-            close()
-        }
-        drawPath(
-            path = fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(lineColor.copy(alpha = 0.5f), Color.Transparent),
-                startY = 0f,
-                endY = height
-            )
-        )
-        
-        // Draw main 3D-like thick stroke
-        drawPath(
-            path = path,
-            color = lineColor,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = 4.dp.toPx(),
-                cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                join = androidx.compose.ui.graphics.StrokeJoin.Round
-            )
-        )
     }
 }
