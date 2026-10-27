@@ -54,4 +54,40 @@ class PortfolioHoldingTest {
         assertEquals(20, totalQty)
         assertEquals(125.0, combinedAvg, 0.001)
     }
+
+    @Test
+    fun testPartialSell_RealizedPnlAndRemainingCostBasis() {
+        // Bought 20 shares at ₹100 = ₹2,000 invested
+        val initialQty = 20
+        val avgBuyPrice = 100.0
+
+        // Sell 5 shares at ₹140 = ₹700 proceeds
+        val sellQty = 5
+        val sellPrice = 140.0
+        val realizedPnl = (sellPrice - avgBuyPrice) * sellQty // (140 - 100) * 5 = ₹200 gain
+
+        // Remaining holding should be 15 shares, and average buy price stays ₹100
+        val remainingQty = initialQty - sellQty
+        val remainingInvestedValue = remainingQty * avgBuyPrice
+
+        assertEquals(200.0, realizedPnl, 0.001)
+        assertEquals(15, remainingQty)
+        assertEquals(1500.0, remainingInvestedValue, 0.001)
+        assertEquals(100.0, avgBuyPrice, 0.001)
+    }
+
+    @Test
+    fun testZeroQuantity_ZeroInvestedValue() {
+        val holding = PortfolioHolding(
+            symbol = "INFY",
+            companyName = "Infosys Ltd",
+            quantity = 0,
+            avgBuyPrice = 1500.0,
+            currentPrice = 1600.0
+        )
+        assertEquals(0.0, holding.investedValue, 0.001)
+        assertEquals(0.0, holding.currentValue, 0.001)
+        assertEquals(0.0, holding.profitLoss, 0.001)
+        assertEquals(0.0, holding.profitLossPercent, 0.001)
+    }
 }

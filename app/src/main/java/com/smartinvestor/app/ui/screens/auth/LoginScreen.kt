@@ -34,9 +34,12 @@ fun LoginScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val loginState by viewModel.loginState.collectAsStateWithLifecycle()
+    val resetState by viewModel.resetPasswordState.collectAsStateWithLifecycle()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmailInput by remember { mutableStateOf("") }
 
     LaunchedEffect(loginState) {
         if (loginState is UiState.Success) onLoginSuccess()
@@ -123,6 +126,22 @@ fun LoginScreen(
                         ErrorCard(message = (loginState as UiState.Error).message)
                     }
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = {
+                            resetEmailInput = email
+                            showResetDialog = true
+                        }) {
+                            Text(
+                                "Forgot Password?",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = PremiumPurpleLight
+                            )
+                        }
+                    }
+
                     PremiumButton(
                         text = "Sign In",
                         onClick = { viewModel.signIn(email, password) },
@@ -160,5 +179,61 @@ fun LoginScreen(
                 }
             }
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showResetDialog = false
+                viewModel.clearResetPasswordState()
+            },
+            title = { Text("Reset Password", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Enter your account email to receive password reset instructions via Supabase Auth.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = resetEmailInput,
+                        onValueChange = { resetEmailInput = it },
+                        label = { Text("Email Address") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    when (val st = resetState) {
+                        is UiState.Success -> {
+                            Text(st.data, color = SuccessGreen, style = MaterialTheme.typography.bodySmall)
+                        }
+                        is UiState.Error -> {
+                            Text(st.message, color = DangerRed, style = MaterialTheme.typography.bodySmall)
+                        }
+                        else -> {}
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.resetPassword(resetEmailInput) },
+                    enabled = resetEmailInput.isNotBlank() && resetState !is UiState.Loading,
+                    colors = ButtonDefaults.buttonColors(containerColor = PremiumPurple)
+                ) {
+                    if (resetState is UiState.Loading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Send Reset Link")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showResetDialog = false
+                    viewModel.clearResetPasswordState()
+                }) {
+                    Text("Close")
+                }
+            }
+        )
     }
 }

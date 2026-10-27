@@ -1,11 +1,13 @@
 package com.smartinvestor.app.ui.screens.stock_detail
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
@@ -36,8 +38,11 @@ fun StockDetailScreen(
     var showOrderDialog by remember { mutableStateOf(false) }
     var orderType by remember { mutableStateOf("BUY") }
     var orderQuantity by remember { mutableIntStateOf(1) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -109,9 +114,16 @@ fun StockDetailScreen(
 
                         Button(
                             onClick = {
-                                orderType = "SELL"
-                                orderQuantity = 1
-                                showOrderDialog = true
+                                val currentData = (uiState as? UiState.Success)?.data
+                                if (currentData != null && currentData.userHoldingQuantity <= 0) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("You do not own any shares of ${currentData.symbol} to sell.")
+                                    }
+                                } else {
+                                    orderType = "SELL"
+                                    orderQuantity = 1
+                                    showOrderDialog = true
+                                }
                             },
                             modifier = Modifier.weight(1f).height(50.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
@@ -189,6 +201,31 @@ fun StockDetailScreen(
                                 )
                             }
                             else -> {}
+                        }
+
+                        // ── Active Holding Position Banner ──
+                        if (data.userHoldingQuantity > 0) {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = PremiumPurple.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, PremiumPurple.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Rounded.AccountBalanceWallet, null, tint = PremiumPurpleLight, modifier = Modifier.size(20.dp))
+                                        Column {
+                                            Text("Your Portfolio Position", style = MaterialTheme.typography.labelSmall, color = PremiumPurpleLight)
+                                            Text("${data.userHoldingQuantity} shares owned", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                                        }
+                                    }
+                                    Text("₹${String.format("%,.2f", data.userHoldingQuantity * quote.currentPrice)}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold))
+                                }
+                            }
                         }
 
                         // ── Chart Area ──

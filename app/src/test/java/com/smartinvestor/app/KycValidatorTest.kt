@@ -1,6 +1,7 @@
 package com.smartinvestor.app
 
 import com.smartinvestor.app.ui.screens.kyc.KycValidator
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,5 +54,20 @@ class KycValidatorTest {
         assertFalse(KycValidator.dematRegex.matches("120816001234567")) // 15 digits
         assertFalse(KycValidator.dematRegex.matches("12081600123456789")) // 17 digits
         assertFalse(KycValidator.dematRegex.matches("IN30012612345678")) // Contains letters
+    }
+
+    @Test
+    fun testAadhaarMasking_TwelveDigits() {
+        // Raw 12 digits
+        val masked = KycValidator.maskAadhaar("234567890123")
+        assertEquals("•••• •••• 0123", masked)
+
+        // Space formatted 12 digits
+        val maskedSpaces = KycValidator.maskAadhaar("2345 6789 0123")
+        assertEquals("•••• •••• 0123", maskedSpaces)
+
+        // Short input retains raw without throwing exception
+        val short = KycValidator.maskAadhaar("123")
+        assertEquals("123", short)
     }
 }

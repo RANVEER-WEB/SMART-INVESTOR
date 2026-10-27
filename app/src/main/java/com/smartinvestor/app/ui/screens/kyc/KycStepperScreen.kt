@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.smartinvestor.app.domain.model.KycData
 import com.smartinvestor.app.ui.components.*
 import com.smartinvestor.app.ui.theme.*
@@ -36,11 +37,19 @@ object KycValidator {
     val ifscRegex = Regex("^[A-Z]{4}0[A-Z0-9]{6}$")
     val accountRegex = Regex("^[0-9]{9,18}$")
     val dematRegex = Regex("^[0-9]{16}$")
+
+    fun maskAadhaar(raw: String): String {
+        val digits = raw.filter { it.isDigit() }
+        return if (digits.length == 12) {
+            "•••• •••• " + digits.takeLast(4)
+        } else raw
+    }
 }
 
 @Composable
 fun KycStepperScreen(
-    onKycComplete: () -> Unit
+    onKycComplete: () -> Unit,
+    viewModel: KycViewModel = hiltViewModel()
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
     val steps = listOf("PAN Card", "Aadhaar", "Bank Account", "Demat Account")
@@ -200,7 +209,14 @@ fun KycStepperScreen(
                             if (currentStep < steps.lastIndex) {
                                 currentStep++
                             } else {
-                                onKycComplete()
+                                viewModel.completeKyc(
+                                    pan = panNumber,
+                                    aadhaar = aadhaarNumber,
+                                    bankAccount = bankAccount,
+                                    ifsc = bankIfsc,
+                                    demat = dematId,
+                                    onSuccess = onKycComplete
+                                )
                             }
                         }
                     },

@@ -9,6 +9,8 @@ import com.smartinvestor.app.domain.model.PortfolioHolding
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,6 +30,10 @@ class PortfolioRepository @Inject constructor(
     private val stockDao: StockDao,
     private val preferencesRepository: UserPreferencesRepository,
 ) {
+    private val executionMutex = Mutex()
+    private var lastOrderSignature: String? = null
+    private var lastOrderTimestamp: Long = 0L
+
     val virtualCash: Flow<Double> = preferencesRepository.virtualCashBalance
 
     val holdings: Flow<List<PortfolioHolding>> = holdingDao.getAllHoldings().map { entities ->
@@ -48,22 +54,29 @@ class PortfolioRepository @Inject constructor(
     val orders: Flow<List<OrderEntity>> = orderDao.getAllOrders()
 
     /**
-     * Executes a simulated BUY order.
+     * Executes a simulated BUY order with mutex locking & duplicate prevention.
      */
     suspend fun executeBuy(
         symbol: String,
         companyName: String,
         quantity: Int,
         price: Double
-    ): Result<OrderEntity> {
+    ): Result<OrderEntity> = executionMutex.withLock {
         if (quantity <= 0) return Result.failure(IllegalArgumentException("Quantity must be greater than 0"))
         if (price <= 0) return Result.failure(IllegalArgumentException("Invalid execution price"))
+
+        // Duplicate submission prevention (1500ms window)
+        val signature = "BUY-$symbol-$quantity"
+        val now = System.currentTimeMillis()
+        if (signature == lastOrderSignature && (now - lastOrderTimestamp) < 1500) {
+            return Result.failure(IllegalStateException("Duplicate order prevented. Please wait a moment before re-submitting."))
+        }
 
         val totalCost = quantity * price
         val currentCash = preferencesRepository.virtualCashBalance.first()
 
         if (currentCash < totalCost) {
-            return Result.failure(IllegalStateException("Insufficient virtual balance: required ₹$totalCost, available ₹$currentCash"))
+            return Result.failure(IllegalStateException("Insufficient virtual balance: required ₹${String.format("%,.2f", totalCost)}, available ₹${String.format("%,.2f", currentCash)}"))
         }
 
         // Deduct virtual balance
@@ -87,7 +100,7 @@ class PortfolioRepository @Inject constructor(
                 existing.copy(
                     quantity = newQuantity,
                     avgBuyPrice = newAvgPrice,
-                    lastUpdated = System.currentTimeMillis()
+                    lastUpdated = now
                 )
             )
         }
@@ -97,28 +110,39 @@ class PortfolioRepository @Inject constructor(
             companyName = companyName,
             type = "BUY",
             quantity = quantity,
-            executionPrice = price
+            executionPrice = price,
+            timestamp = now
         )
         val orderId = orderDao.insertOrder(order)
+
+        lastOrderSignature = signature
+        lastOrderTimestamp = now
+
         return Result.success(order.copy(id = orderId))
     }
 
     /**
-     * Executes a simulated SELL order.
+     * Executes a simulated SELL order with mutex locking & duplicate prevention.
      */
     suspend fun executeSell(
         symbol: String,
         quantity: Int,
         price: Double
-    ): Result<OrderEntity> {
+    ): Result<OrderEntity> = executionMutex.withLock {
         if (quantity <= 0) return Result.failure(IllegalArgumentException("Quantity must be greater than 0"))
         if (price <= 0) return Result.failure(IllegalArgumentException("Invalid execution price"))
+
+        val signature = "SELL-$symbol-$quantity"
+        val now = System.currentTimeMillis()
+        if (signature == lastOrderSignature && (now - lastOrderTimestamp) < 1500) {
+            return Result.failure(IllegalStateException("Duplicate order prevented. Please wait a moment before re-submitting."))
+        }
 
         val existing = holdingDao.getHolding(symbol)
             ?: return Result.failure(IllegalStateException("You do not hold shares of $symbol to sell"))
 
         if (existing.quantity < quantity) {
-            return Result.failure(IllegalStateException("Cannot sell $quantity shares: you only own ${existing.quantity} shares"))
+            return Result.failure(IllegalStateException("Cannot sell $quantity shares: you only own ${existing.quantity} shares of $symbol"))
         }
 
         val totalRevenue = quantity * price
@@ -132,10 +156,11 @@ class PortfolioRepository @Inject constructor(
         if (remainingQty <= 0) {
             holdingDao.deleteHolding(symbol)
         } else {
+            // avgBuyPrice stays unchanged on partial sell
             holdingDao.upsertHolding(
                 existing.copy(
                     quantity = remainingQty,
-                    lastUpdated = System.currentTimeMillis()
+                    lastUpdated = now
                 )
             )
         }
@@ -145,16 +170,21 @@ class PortfolioRepository @Inject constructor(
             companyName = existing.companyName,
             type = "SELL",
             quantity = quantity,
-            executionPrice = price
+            executionPrice = price,
+            timestamp = now
         )
         val orderId = orderDao.insertOrder(order)
+
+        lastOrderSignature = signature
+        lastOrderTimestamp = now
+
         return Result.success(order.copy(id = orderId))
     }
 
     /**
      * Seeds initial demo portfolio if completely empty.
      */
-    suspend fun seedDemoHoldingsIfEmpty() {
+    suspend fun seedDemoHoldingsIfEmpty() = executionMutex.withLock {
         val current = holdingDao.getAllHoldings().first()
         if (current.isEmpty()) {
             holdingDao.upsertHolding(HoldingEntity("AAPL", "Apple Inc.", 15, 160.0))

@@ -49,6 +49,21 @@ class AuthRepository @Inject constructor() {
     }
 
     /**
+     * Sends password reset email via Supabase Auth
+     */
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                SupabaseClient.client.auth.resetPasswordForEmail(email)
+                Result.success(Unit)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
      * Logs out the current user
      */
     suspend fun signOut() {

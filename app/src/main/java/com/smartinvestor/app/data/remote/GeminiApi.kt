@@ -49,6 +49,17 @@ class GeminiApi @Inject constructor() {
      * Maintains conversation history for multi-turn chat.
      */
     suspend fun sendMessage(userMessage: String): String = withContext(Dispatchers.IO) {
+        val apiKey = BuildConfig.GEMINI_API_KEY.trim()
+        if (apiKey.isBlank()) {
+            throw IllegalStateException("Gemini API key is not configured in local.properties")
+        }
+
+        // Sliding context window: prune older history to keep at most last 10 turns
+        if (chatHistory.size > 10) {
+            val toRemove = chatHistory.size - 10
+            repeat(toRemove) { chatHistory.removeAt(0) }
+        }
+
         // Prepend system instruction on the very first user turn
         val effectiveMessage = if (chatHistory.isEmpty()) {
             "$SYSTEM_PROMPT\n\n---\n\nUser: $userMessage"

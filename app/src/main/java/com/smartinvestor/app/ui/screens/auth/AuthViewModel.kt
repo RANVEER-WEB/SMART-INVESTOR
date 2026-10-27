@@ -23,6 +23,9 @@ class AuthViewModel @Inject constructor(
     private val _registerState = MutableStateFlow<UiState<User>>(UiState.Idle)
     val registerState: StateFlow<UiState<User>> = _registerState.asStateFlow()
 
+    private val _resetPasswordState = MutableStateFlow<UiState<String>>(UiState.Idle)
+    val resetPasswordState: StateFlow<UiState<String>> = _resetPasswordState.asStateFlow()
+
     fun signIn(email: String, password: String) {
         viewModelScope.launch {
             _loginState.value = UiState.Loading
@@ -52,5 +55,24 @@ class AuthViewModel @Inject constructor(
             authRepository.signOut()
             _loginState.value = UiState.Idle
         }
+    }
+
+    fun resetPassword(email: String) {
+        if (email.isBlank()) {
+            _resetPasswordState.value = UiState.Error("Please enter your email address")
+            return
+        }
+        viewModelScope.launch {
+            _resetPasswordState.value = UiState.Loading
+            val result = authRepository.sendPasswordResetEmail(email)
+            _resetPasswordState.value = result.fold(
+                onSuccess = { UiState.Success("Password reset instructions sent to $email") },
+                onFailure = { UiState.Error(it.message ?: "Failed to send reset email") }
+            )
+        }
+    }
+
+    fun clearResetPasswordState() {
+        _resetPasswordState.value = UiState.Idle
     }
 }

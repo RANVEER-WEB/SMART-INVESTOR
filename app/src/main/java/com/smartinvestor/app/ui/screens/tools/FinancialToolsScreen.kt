@@ -52,8 +52,12 @@ fun FinancialToolsScreen(
     val targetAmt = targetCorpus.toDoubleOrNull() ?: 0.0
     val goalM = (goalYears.toIntOrNull() ?: 0) * 12
     val goalR = (goalReturn.toDoubleOrNull() ?: 0.0) / 100.0 / 12.0
-    val requiredMonthlySip = if (goalR > 0 && goalM > 0) {
-        targetAmt / ((((1.0 + goalR).pow(goalM.toDouble()) - 1.0) / goalR) * (1.0 + goalR))
+    val requiredMonthlySip = if (goalM > 0) {
+        if (goalR > 0) {
+            targetAmt / ((((1.0 + goalR).pow(goalM.toDouble()) - 1.0) / goalR) * (1.0 + goalR))
+        } else {
+            targetAmt / goalM
+        }
     } else 0.0
 
     // ── Tax Estimator State (Indian Equities FY24-25) ──
@@ -62,10 +66,12 @@ fun FinancialToolsScreen(
 
     val stcg = shortTermGain.toDoubleOrNull() ?: 0.0
     val ltcg = longTermGain.toDoubleOrNull() ?: 0.0
-    val stcgTax = stcg * 0.20 // 20% STCG
+    val stcgTax = stcg * 0.20 // 20% STCG per Union Budget 2024
     val taxableLtcg = (ltcg - 125000.0).coerceAtLeast(0.0) // ₹1.25L exemption
     val ltcgTax = taxableLtcg * 0.125 // 12.5% LTCG
-    val totalEstimatedTax = stcgTax + ltcgTax
+    val baseTax = stcgTax + ltcgTax
+    val cess = baseTax * 0.04 // 4% Health & Education Cess
+    val totalEstimatedTax = baseTax + cess
 
     Scaffold(
         topBar = {
@@ -234,8 +240,9 @@ fun FinancialToolsScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 ResultRow("STCG Tax @ 20%", "₹${String.format("%,.0f", stcgTax)}", MaterialTheme.colorScheme.onSurface)
                                 ResultRow("LTCG Tax @ 12.5% (after ₹1.25L relief)", "₹${String.format("%,.0f", ltcgTax)}", MaterialTheme.colorScheme.onSurface)
+                                ResultRow("Health & Education Cess (4%)", "₹${String.format("%,.0f", cess)}", MaterialTheme.colorScheme.onSurfaceVariant)
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                                ResultRow("Estimated Total Tax", "₹${String.format("%,.0f", totalEstimatedTax)}", DangerRed, bold = true)
+                                ResultRow("Total Tax Payable", "₹${String.format("%,.0f", totalEstimatedTax)}", DangerRed, bold = true)
                             }
                         }
                     }

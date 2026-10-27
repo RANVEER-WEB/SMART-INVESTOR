@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -64,11 +65,10 @@ class StockDetailViewModel @Inject constructor(
                 val from = now - (_timeframe.value.days * secondsPerDay)
                 val candles = stockRepository.getStockCandles(symbol, "D", from, now).getOrNull()
 
-                // Check if user holds any shares in paper portfolio
-                val holding = portfolioRepository.holdings
-                // Get immediate current count
-                val currentHoldings = portfolioRepository.holdings
-                var userShares = 0
+                // Query user's current holdings for this symbol
+                val currentHoldings = portfolioRepository.holdings.first()
+                val userHolding = currentHoldings.find { it.symbol.equals(symbol, ignoreCase = true) }
+                val userShares = userHolding?.quantity ?: 0
 
                 _uiState.value = UiState.Success(
                     StockDetailData(
