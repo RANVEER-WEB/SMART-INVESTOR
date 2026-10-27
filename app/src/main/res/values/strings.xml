@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Smart Investor</string>
+    <string name="app_tagline">Invest Smarter. Grow Faster.</string>
+    <string name="trust_statement">Your trusted partner in wealth creation</string>
+
+    <!-- Auth -->
+    <string name="login_title">The Vault</string>
+    <string name="login_subtitle">Access your investment command center</string>
+    <string name="register_title">Create Account</string>
+    <string name="register_subtitle">Start your investment journey</string>
+    <string name="sign_in">Sign In</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="register">Register</string>
+    <string name="email_label">Email</string>
+    <string name="password_label">Password</string>
+    <string name="full_name_label">Full Name</string>
+    <string name="biometric_prompt_title">Biometric Login</string>
+    <string name="biometric_prompt_subtitle">Use your fingerprint or face to sign in</string>
+
+    <!-- KYC -->
+    <string name="kyc_title">KYC Verification</string>
+    <string name="kyc_pan">PAN Card</string>
+    <string name="kyc_aadhaar">Aadhaar</string>
+    <string name="kyc_bank">Bank Account</string>
+    <string name="kyc_demat">Demat Account</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="portfolio_value">Total Portfolio Value</string>
+    <string name="market_movers">Market Movers</string>
+    <string name="quick_actions">Quick Actions</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_portfolio">Portfolio</string>
+    <string name="nav_ai">AI</string>
+    <string name="nav_watchlist">Watchlist</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="error_network">No internet connection. Showing cached data.</string>
+    <string name="retry">Smart Retry</string>
+    <string name="cached_data">Showing cached data</string>
+
+    <!-- Support -->
+    <string name="support_email">ranveermandal183@gmail.com</string>
+    <string name="support_phone">+91 8340320664</string>
+    <string name="developer_name">Ranveer Mandal</string>
+
+    <!-- Content descriptions for accessibility -->
+    <string name="cd_notifications">Notifications</string>
+    <string name="cd_ai_advisor">AI Advisor</string>
+    <string name="cd_back">Go back</string>
+    <string name="cd_trending_up">Price going up</string>
+    <string name="cd_trending_down">Price going down</string>
+</resources>

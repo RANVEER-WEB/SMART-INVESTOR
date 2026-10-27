@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme (used before Compose takes over) -->
+    <style name="Theme.SmartInvestor" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/dark_background</item>
+        <item name="android:navigationBarColor">@color/dark_background</item>
+        <item name="android:windowBackground">@color/dark_background</item>
+    </style>
+
+    <!-- Splash screen theme -->
+    <style name="Theme.SmartInvestor.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/dark_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.SmartInvestor</item>
+    </style>
+</resources>

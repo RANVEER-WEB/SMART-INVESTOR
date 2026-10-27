@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Colors from brandguidelines.md -->
+    <!-- Dark Mode -->
+    <color name="dark_background">#FF071120</color>
+    <color name="dark_surface">#FF0E1836</color>
+
+    <!-- Light Mode -->
+    <color name="light_background">#FFF4F7FA</color>
+    <color name="light_surface">#FFFFFFFF</color>
+
+    <!-- Accents -->
+    <color name="premium_purple">#FF7C3AED</color>
+    <color name="success_green">#FF16C784</color>
+    <color name="danger_red">#FFEA3943</color>
+
+    <!-- System -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

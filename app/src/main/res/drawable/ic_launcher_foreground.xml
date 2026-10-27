@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108"
+    android:tint="#FFFFFF">
+
+    <!-- Diamond icon representing Smart Investor -->
+    <!-- Centered within the 108dp adaptive icon safe zone (center 66dp) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 L72,50 L54,78 L36,50 Z"
+        android:strokeWidth="0" />
+
+    <!-- Inner chart line inside the diamond -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#7C3AED"
+        android:strokeWidth="2.5"
+        android:pathData="M42,56 L48,48 L52,54 L56,42 L60,50 L66,44" />
+
+    <!-- Small upward arrow at chart end -->
+    <path
+        android:fillColor="#7C3AED"
+        android:pathData="M66,44 L63,47 L66,44 L69,47 Z" />
+</vector>
