@@ -132,9 +132,9 @@ fun SettingsScreen(
 
         // ── About & Version ──
         GlassCard(modifier = Modifier.fillMaxWidth()) {
-            SettingsRow("App Version", "2.0.0-PRO", Icons.Rounded.Info)
+            SettingsRow("App Version", "2.1.0-PRO", Icons.Rounded.Info)
             SettingsRow("Design Engine", "Luxury Glass 2.0", Icons.Rounded.AutoAwesome)
-            SettingsRow("AI Engine", "Gemini 2.0 Flash REST", Icons.Rounded.Psychology)
+            SettingsRow("AI Engine", "Gemini 3.8 Flash REST", Icons.Rounded.Psychology)
         }
 
         // ── Sign Out ──

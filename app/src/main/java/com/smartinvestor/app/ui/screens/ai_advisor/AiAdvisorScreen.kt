@@ -56,7 +56,7 @@ fun AiAdvisorScreen(
                     SignatureAiOrbIcon(isThinking = isThinking)
                     Column {
                         Text("Smart Investor AI", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text("Powered by Gemini 2.0 Flash", style = MaterialTheme.typography.labelSmall, color = PremiumPurpleLight)
+                        Text("Powered by Gemini 3.8 Flash", style = MaterialTheme.typography.labelSmall, color = PremiumPurpleLight)
                     }
                 }
             },
@@ -87,6 +87,11 @@ fun AiAdvisorScreen(
                     message = msg,
                     onCopy = {
                         clipboardManager.setText(AnnotatedString(msg.content))
+                    },
+                    onRetry = {
+                        msg.failedPrompt?.let { prompt ->
+                            viewModel.retryLastMessage(prompt)
+                        }
                     }
                 )
             }
@@ -194,16 +199,28 @@ private fun SignatureAiOrbIcon(isThinking: Boolean) {
 }
 
 @Composable
-private fun ChatBubble(message: ChatMessage, onCopy: () -> Unit) {
+private fun ChatBubble(
+    message: ChatMessage,
+    onCopy: () -> Unit,
+    onRetry: () -> Unit = {}
+) {
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
-    val bubbleColor = if (message.isUser) PremiumPurple else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-    val textColor = if (message.isUser) Color.White else MaterialTheme.colorScheme.onSurface
+    val bubbleColor = when {
+        message.isUser -> PremiumPurple
+        message.isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+    }
+    val textColor = when {
+        message.isUser -> Color.White
+        message.isError -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurface
+    }
 
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
         GlassCard(
             modifier = Modifier.widthIn(max = 340.dp),
             showGlow = message.isUser,
-            glowColor = PremiumPurple
+            glowColor = if (message.isError) MaterialTheme.colorScheme.error else PremiumPurple
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (!message.isUser) {
@@ -213,8 +230,17 @@ private fun ChatBubble(message: ChatMessage, onCopy: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Rounded.AutoAwesome, null, tint = PremiumPurpleLight, modifier = Modifier.size(14.dp))
-                            Text("AI Analysis", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = PremiumPurpleLight)
+                            Icon(
+                                if (message.isError) Icons.Rounded.Warning else Icons.Rounded.AutoAwesome,
+                                null,
+                                tint = if (message.isError) MaterialTheme.colorScheme.error else PremiumPurpleLight,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                if (message.isError) "Status" else "AI Analysis",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (message.isError) MaterialTheme.colorScheme.error else PremiumPurpleLight
+                            )
                         }
                         IconButton(onClick = onCopy, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Rounded.ContentCopy, "Copy", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
@@ -228,6 +254,23 @@ private fun ChatBubble(message: ChatMessage, onCopy: () -> Unit) {
                     color = textColor,
                     lineHeight = 20.sp
                 )
+
+                if (message.isError && message.canRetry) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FilledTonalButton(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = PremiumPurple.copy(alpha = 0.3f),
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Retry Prompt", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
         }
     }
@@ -259,7 +302,7 @@ private fun AiThinkingOrb() {
             modifier = Modifier.size(26.dp).scale(scale)
         )
         Text(
-            text = "AI is evaluating market conditions & calculating scenarios...",
+            text = "Gemini 3.8 Flash is reasoning and compiling market scenarios...",
             style = MaterialTheme.typography.bodySmall,
             color = PremiumPurpleLight
         )

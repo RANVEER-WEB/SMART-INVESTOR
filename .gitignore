@@ -2,6 +2,7 @@
 local.properties
 .env
 .env.*
+!.env.example
 .kotlin/
 
 # Gradle

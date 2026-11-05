@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartinvestor.app.data.remote.GeminiApi
+import com.smartinvestor.app.data.remote.GeminiApiException
 import com.smartinvestor.app.data.repository.PortfolioRepository
 import com.smartinvestor.app.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,7 +18,10 @@ import javax.inject.Inject
 data class ChatMessage(
     val content: String,
     val isUser: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val isError: Boolean = false,
+    val canRetry: Boolean = false,
+    val failedPrompt: String? = null
 )
 
 @HiltViewModel
@@ -34,8 +38,8 @@ class AiAdvisorViewModel @Inject constructor(
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(
             ChatMessage(
-                content = "👋 Welcome to Smart Investor AI Copilot! I am your AI financial tutor and market analyst.\n\n" +
-                        "I can analyze stocks, break down bull/bear scenarios, explain financial statements, and guide your wealth strategy. All insights are educational and SEBI-aligned.\n\n" +
+                content = "👋 Welcome to Smart Investor AI Copilot! Powered by **Gemini 3.8 Flash**.\n\n" +
+                        "I can analyze Indian equities, break down Bull/Bear/Neutral scenarios, explain financial concepts, and evaluate portfolio diversification. All insights are educational and SEBI-aligned.\n\n" +
                         "How can I assist your investment journey today?",
                 isUser = false
             )
@@ -47,7 +51,7 @@ class AiAdvisorViewModel @Inject constructor(
     val isThinking: StateFlow<Boolean> = _isThinking.asStateFlow()
 
     val suggestionChips = listOf(
-        "Analyze AAPL with Bull/Bear cases",
+        "Analyze RELIANCE with Bull/Bear cases",
         "Explain P/E ratio in plain English",
         "How to diversify a ₹1,00,000 portfolio?",
         "SIP vs Lumpsum in volatile markets"
@@ -82,35 +86,51 @@ class AiAdvisorViewModel @Inject constructor(
                     
                     [User Query]
                     $text
-                    
-                    [Response Structure Instructions]
-                    1. Concise Explanation or Analysis
-                    2. Bullish, Bearish, and Neutral considerations (if evaluating an asset or sector)
-                    3. Key Risk Factors & Assumptions
-                    4. Brief educational takeaway (Remind that past performance doesn't guarantee future returns)
                 """.trimIndent()
 
-                Log.d(TAG, "Querying Gemini API...")
+                Log.d(TAG, "Querying Gemini 3.8 Flash...")
                 val response = geminiApi.sendMessage(contextualPrompt)
                 _messages.value = _messages.value + ChatMessage(content = response, isUser = false)
             } catch (e: Exception) {
                 Log.e(TAG, "AI Advisor error: ${e.message}", e)
-                val errorDetail = when {
-                    e.message?.contains("401") == true || e.message?.contains("403") == true ->
-                        "⚠️ API key may be invalid or expired. Please check your Gemini API key in local.properties."
-                    e.message?.contains("429") == true ->
-                        "⏳ Gemini rate limit reached. Please wait a moment before sending another prompt."
-                    e.message?.contains("Unable to resolve host") == true ||
-                    e.message?.contains("timeout") == true ->
-                        "📡 Network error. Please check your internet connection."
+                val errorMessage = when (e) {
+                    is GeminiApiException.AuthenticationException ->
+                        "⚠️ API Authentication Error: ${e.message ?: "Please check your GEMINI_API_KEY in local.properties."}"
+                    is GeminiApiException.ModelUnavailableException ->
+                        "⚠️ Model Unavailable (404): The requested Gemini 3.8 Flash endpoint is currently unreachable."
+                    is GeminiApiException.RateLimitExceededException ->
+                        "⏳ Rate Limit Exceeded (429): Quota exhausted or rate limited. Please wait a moment before sending another prompt."
+                    is GeminiApiException.ServerUnavailableException ->
+                        "⚡ High Demand (503): Gemini 3.8 Flash is currently experiencing high global demand. Spikes are temporary. Tap 'Retry' to try again."
+                    is GeminiApiException.NetworkException ->
+                        "📡 Network Error: ${e.message ?: "Unable to connect. Please check your internet connection."}"
+                    is GeminiApiException.InvalidRequestException ->
+                        "⚠️ Invalid Request (400): ${e.message ?: "Please rephrase your query."}"
+                    is GeminiApiException.MalformedResponseException ->
+                        "⚠️ Response Parsing Error: ${e.message ?: "Failed to read AI response. Please try again."}"
                     else ->
-                        "⚠️ Sorry, I encountered an error processing your inquiry. Please try again."
+                        "⚠️ Sorry, I encountered an unexpected error: ${e.message ?: "Please try again."}"
                 }
-                _messages.value = _messages.value + ChatMessage(content = errorDetail, isUser = false)
+
+                val canRetry = (e as? GeminiApiException)?.isRetryable ?: false
+                _messages.value = _messages.value + ChatMessage(
+                    content = errorMessage,
+                    isUser = false,
+                    isError = true,
+                    canRetry = canRetry,
+                    failedPrompt = text
+                )
             } finally {
                 _isThinking.value = false
             }
         }
+    }
+
+    fun retryLastMessage(failedPrompt: String) {
+        // Remove the error message from history
+        _messages.value = _messages.value.filterNot { it.isError && it.failedPrompt == failedPrompt }
+        // Re-execute sending the prompt
+        sendMessage(failedPrompt)
     }
 
     fun resetChat() {
