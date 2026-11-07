@@ -83,34 +83,34 @@ class GeminiApi @Inject constructor(
         // Add user turn to history
         chatHistory.add(buildContent("user", userMessage))
 
-        val requestJson = buildJsonObject {
-            put("systemInstruction", buildJsonObject {
-                put("parts", buildJsonArray {
-                    add(buildJsonObject { put("text", SYSTEM_PROMPT) })
-                })
-            })
-            put("contents", buildJsonArray {
-                chatHistory.forEach { add(it) }
-            })
-            put("generationConfig", buildJsonObject {
-                // Gemini 3.8 Flash uses thinkingLevel (LOW, MEDIUM, HIGH)
-                // "MINIMAL" is not supported. Legacy sampling (topK, topP, candidateCount) removed.
-                put("thinkingConfig", buildJsonObject {
-                    put("thinkingLevel", "MEDIUM")
-                    put("includeThoughts", false)
-                })
-                put("maxOutputTokens", 4096)
-            })
-        }
-
-        val request = Request.Builder()
-            .url(ENDPOINT_URL)
-            .addHeader("x-goog-api-key", apiKey)
-            .post(requestJson.toString().toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
         val responseBody = try {
-            executeWithRetry(request)
+            executeWithModelFallback { endpointUrl, includeThinking ->
+                val requestJson = buildJsonObject {
+                    put("systemInstruction", buildJsonObject {
+                        put("parts", buildJsonArray {
+                            add(buildJsonObject { put("text", SYSTEM_PROMPT) })
+                        })
+                    })
+                    put("contents", buildJsonArray {
+                        chatHistory.forEach { add(it) }
+                    })
+                    put("generationConfig", buildJsonObject {
+                        if (includeThinking) {
+                            put("thinkingConfig", buildJsonObject {
+                                put("thinkingLevel", "MEDIUM")
+                                put("includeThoughts", false)
+                            })
+                        }
+                        put("maxOutputTokens", 4096)
+                    })
+                }
+
+                Request.Builder()
+                    .url(endpointUrl)
+                    .addHeader("x-goog-api-key", apiKey)
+                    .post(requestJson.toString().toRequestBody(JSON_MEDIA_TYPE))
+                    .build()
+            }
         } catch (e: Exception) {
             // Remove user message from chatHistory on failure to avoid desync
             chatHistory.removeLastOrNull()
@@ -118,7 +118,7 @@ class GeminiApi @Inject constructor(
         }
 
         val text = parseGeminiResponse(responseBody)
-        Log.d(TAG, "Gemini 3.8 Flash responded successfully (${text.length} chars)")
+        Log.d(TAG, "Gemini AI responded successfully (${text.length} chars)")
         chatHistory.add(buildContent("model", text))
         text
     }
@@ -152,31 +152,34 @@ class GeminiApi @Inject constructor(
             Be concise and actionable. Remind the user this is for educational purposes only.
         """.trimIndent()
 
-        val requestJson = buildJsonObject {
-            put("systemInstruction", buildJsonObject {
-                put("parts", buildJsonArray {
-                    add(buildJsonObject { put("text", SYSTEM_PROMPT) })
+        val responseBody = executeWithModelFallback { endpointUrl, includeThinking ->
+            val requestJson = buildJsonObject {
+                put("systemInstruction", buildJsonObject {
+                    put("parts", buildJsonArray {
+                        add(buildJsonObject { put("text", SYSTEM_PROMPT) })
+                    })
                 })
-            })
-            put("contents", buildJsonArray {
-                add(buildContent("user", prompt))
-            })
-            put("generationConfig", buildJsonObject {
-                put("thinkingConfig", buildJsonObject {
-                    put("thinkingLevel", "LOW")
-                    put("includeThoughts", false)
+                put("contents", buildJsonArray {
+                    add(buildContent("user", prompt))
                 })
-                put("maxOutputTokens", 1024)
-            })
+                put("generationConfig", buildJsonObject {
+                    if (includeThinking) {
+                        put("thinkingConfig", buildJsonObject {
+                            put("thinkingLevel", "LOW")
+                            put("includeThoughts", false)
+                        })
+                    }
+                    put("maxOutputTokens", 1024)
+                })
+            }
+
+            Request.Builder()
+                .url(endpointUrl)
+                .addHeader("x-goog-api-key", apiKey)
+                .post(requestJson.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
         }
 
-        val request = Request.Builder()
-            .url(ENDPOINT_URL)
-            .addHeader("x-goog-api-key", apiKey)
-            .post(requestJson.toString().toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
-        val responseBody = executeWithRetry(request)
         parseGeminiResponse(responseBody)
     }
 
@@ -188,6 +191,46 @@ class GeminiApi @Inject constructor(
     }
 
     // ── Network Execution & Resilient Retry Engine ───────────
+
+    private suspend fun executeWithModelFallback(
+        buildRequest: (endpointUrl: String, includeThinking: Boolean) -> Request
+    ): String {
+        var lastException: GeminiApiException? = null
+
+        for (modelId in FALLBACK_MODEL_IDS) {
+            val endpointUrl = getEndpointUrl(modelId)
+            val thinkingOptions = listOf(true, false)
+
+            for (includeThinking in thinkingOptions) {
+                try {
+                    val request = buildRequest(endpointUrl, includeThinking)
+                    val response = executeWithRetry(request)
+                    if (modelId != MODEL_ID) {
+                        Log.i(TAG, "Fallback Gemini model '$modelId' succeeded (includeThinking=$includeThinking)")
+                    }
+                    return response
+                } catch (e: GeminiApiException.ModelUnavailableException) {
+                    Log.w(TAG, "Model '$modelId' unavailable (404). Attempting fallback option...")
+                    lastException = e
+                    break // 404 is model-specific, move to next modelId in FALLBACK_MODEL_IDS
+                } catch (e: GeminiApiException.InvalidRequestException) {
+                    lastException = e
+                    if (includeThinking) {
+                        Log.w(TAG, "Invalid request with thinkingConfig on model '$modelId'. Retrying without thinkingConfig...")
+                        continue
+                    } else {
+                        break
+                    }
+                } catch (e: GeminiApiException) {
+                    throw e
+                }
+            }
+        }
+
+        throw lastException ?: GeminiApiException.ModelUnavailableException(
+            "All Gemini AI model endpoints were unavailable (404). Please check your internet connection or API configuration."
+        )
+    }
 
     private suspend fun executeWithRetry(request: Request): String {
         var lastException: Exception? = null
@@ -327,6 +370,11 @@ class GeminiApi @Inject constructor(
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
         const val MODEL_ID = "gemini-3.8-flash"
+        val FALLBACK_MODEL_IDS = listOf("gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash")
+
+        fun getEndpointUrl(modelId: String = MODEL_ID): String =
+            "https://generativelanguage.googleapis.com/v1beta/models/$modelId:generateContent"
+
         const val ENDPOINT_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/$MODEL_ID:generateContent"
 

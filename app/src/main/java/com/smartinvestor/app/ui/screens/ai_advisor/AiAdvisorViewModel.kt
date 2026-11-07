@@ -97,11 +97,11 @@ class AiAdvisorViewModel @Inject constructor(
                     is GeminiApiException.AuthenticationException ->
                         "⚠️ API Authentication Error: ${e.message ?: "Please check your GEMINI_API_KEY in local.properties."}"
                     is GeminiApiException.ModelUnavailableException ->
-                        "⚠️ Model Unavailable (404): The requested Gemini 3.8 Flash endpoint is currently unreachable."
+                        "⚠️ Model Unavailable (404): ${e.message ?: "The requested Gemini model endpoint is currently unreachable. Tap 'Retry' to attempt fallback endpoints."}"
                     is GeminiApiException.RateLimitExceededException ->
                         "⏳ Rate Limit Exceeded (429): Quota exhausted or rate limited. Please wait a moment before sending another prompt."
                     is GeminiApiException.ServerUnavailableException ->
-                        "⚡ High Demand (503): Gemini 3.8 Flash is currently experiencing high global demand. Spikes are temporary. Tap 'Retry' to try again."
+                        "⚡ High Demand (503): Gemini AI is currently experiencing high global demand. Spikes are temporary. Tap 'Retry' to try again."
                     is GeminiApiException.NetworkException ->
                         "📡 Network Error: ${e.message ?: "Unable to connect. Please check your internet connection."}"
                     is GeminiApiException.InvalidRequestException ->
@@ -112,7 +112,7 @@ class AiAdvisorViewModel @Inject constructor(
                         "⚠️ Sorry, I encountered an unexpected error: ${e.message ?: "Please try again."}"
                 }
 
-                val canRetry = (e as? GeminiApiException)?.isRetryable ?: false
+                val canRetry = ((e as? GeminiApiException)?.isRetryable ?: false) || e is GeminiApiException.ModelUnavailableException
                 _messages.value = _messages.value + ChatMessage(
                     content = errorMessage,
                     isUser = false,

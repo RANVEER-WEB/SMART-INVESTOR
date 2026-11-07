@@ -174,4 +174,17 @@ class GeminiApiMigrationTest {
         val netErr = GeminiApiException.NetworkException("Timed out")
         assertTrue(netErr.isRetryable)
     }
+
+    @Test
+    fun testFallbackModelIds_ContainsCandidateModels() {
+        assertTrue(GeminiApi.FALLBACK_MODEL_IDS.contains("gemini-3.8-flash"))
+        assertTrue(GeminiApi.FALLBACK_MODEL_IDS.contains("gemini-2.5-flash"))
+        assertTrue(GeminiApi.FALLBACK_MODEL_IDS.contains("gemini-1.5-flash"))
+    }
+
+    @Test
+    fun testGetEndpointUrl_ConstructsValidUrl() {
+        val url = GeminiApi.getEndpointUrl("gemini-2.5-flash")
+        assertEquals("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", url)
+    }
 }
